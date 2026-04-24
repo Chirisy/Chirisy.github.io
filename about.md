@@ -6,19 +6,19 @@
 
 ## 关注方向
 
-- 大语言模型训练与强化学习
-- 分布式训练、工程化和性能优化
-- 后端开发、系统设计和工具链建设
+- 强化学习
+- 分布式训练、工程化和推理性能优化
+- 后端开发、系统设计和云原生
 - 技术写作与知识管理
 
 ## 技术栈
 
 | 方向 | 内容 |
 | --- | --- |
-| 编程语言 | Python、Go、Java、JavaScript |
-| AI 工程 | PyTorch、verl、LLM 训练与评测 |
-| 后端工程 | Spring Boot、数据库、缓存、消息队列 |
-| 工具平台 | Git、Docker、Linux、GitHub Pages |
+| 编程语言 | Python、Go |
+| AI 工程 | PyTorch、verl、SGLang |
+| 后端工程 | FastAPI、Gin、MySQL、Redis、Kafka、Flink |
+| 工具平台 | Git、Docker、k8s、Linux、GitHub Pages |
 
 ## 联系方式
 

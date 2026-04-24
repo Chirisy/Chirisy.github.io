@@ -23,7 +23,7 @@
 | [关于我](about.md) | 个人介绍与联系方式 |
 
 ## 本地预览
-
+### 1. 启动node.js服务器
 在仓库根目录启动任意静态服务器即可预览：
 
 ```bash
@@ -34,6 +34,17 @@ node serve.js
 
 ```text
 http://localhost:3000
+```
+
+### 2. 启动python服务器
+
+```bash
+python -m http.server 3000
+```
+
+### 3. docsify-cli
+```bash
+docsify serve . #项目根目录
 ```
 
 ## 部署
