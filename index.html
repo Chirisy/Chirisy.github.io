@@ -16,22 +16,29 @@
       name: 'Chirisy',
       repo: 'Chirisy/Chirisy.github.io',
       homepage: 'README.md',
-      loadSidebar: true,
+      maxLevel: 4,
+      // loadSidebar: true,
       loadNavbar: true,
+      // relativePath: true,
       alias: {
-        '/.*/_sidebar.md': '/_sidebar.md',
         '/.*/_navbar.md': '/_navbar.md'
       },
-      subMaxLevel: 3,
+      subMaxLevel: 2,
       auto2top: true,
       notFoundPage: true,
       mergeNavbar: true,
       search: {
-        maxAge: 86400000,
         paths: 'auto',
-        placeholder: '搜索文档',
-        noData: '没有找到结果',
-        depth: 4
+        placeholder: '🔍 搜索',
+        noData: '😒 找不到结果',
+        // Headline depth, 1 - 6
+        depth: 6,
+        maxAge: 86400000, // timeout
+      },
+      footer: {
+        copy: 'Make each day count And Towards happiness ',
+        pre: '<hr/>',
+        style: 'text-align: left;',
       },
       copyCode: {
         buttonText: '复制',
