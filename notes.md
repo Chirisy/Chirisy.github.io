@@ -5,8 +5,8 @@
 ## AI 与机器学习
 
 - 大语言模型
-- 强化学习与 RLHF
-- verl 框架实践
+- [强化学习与 RLHF](/RL/)
+- [verl 框架实践](/verl-tutorial/)
 - 模型评测与数据处理
 - SGLang
 
