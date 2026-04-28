@@ -6,7 +6,7 @@
 
 | 主题 | 文件 | 内容 |
 | --- | --- | --- |
-| PPO、GRPO、DPO、GSPO 对比 | [ppo_grpo_dpo_gspo_comparison.md](ppo_grpo_dpo_gspo_comparison.md) | 比较四种 LLM 对齐/RL 算法的主要区别、优缺点和选型建议 |
+| PPO、GRPO、DPO、GSPO 对比 | [ppo_grpo_dpo_gspo_comparison.md](./ppo_grpo_dpo_gspo_comparison.md) | 比较四种 LLM 对齐/RL 算法的主要区别、优缺点和选型建议 |
 
 ## 待整理资料
 
