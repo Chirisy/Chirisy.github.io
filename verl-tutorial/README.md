@@ -4,13 +4,13 @@
 
 ## 快速入口
 
-[part0-foundation](./part0-foundation)
+[part0-foundation](/verl-tutorial/part0-foundation)
 
-[part1-engineering-training](./part1-engineering-training)
+[part1-engineering-training](/verl-tutorial/part1-engineering-training)
 
-[part2-research-extension](./part2-research-extension)
+[part2-research-extension](/verl-tutorial/part2-research-extension)
 
-[appendix](./appendix)
+[appendix](/verl-tutorial/appendix)
 
 ## 这是什么
 
