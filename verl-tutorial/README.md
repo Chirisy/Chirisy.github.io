@@ -2,6 +2,16 @@
 
 > 基于 verl v0.7.0 | 更新日期：2026-03-08
 
+## 快速入口
+
+[part0-foundation](./part0-foundation)
+
+[part1-engineering-training](./part1-engineering-training)
+
+[part2-research-extension](./part2-research-extension)
+
+[appendix](./appendix)
+
 ## 这是什么
 
 这是一份面向实践者的 verl 框架使用教程。verl 是字节跳动开源的大语言模型强化学习训练框架，支持 PPO、GRPO 等多种算法，以及分布式训练、AgentRL 等场景。
