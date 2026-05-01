@@ -12,7 +12,7 @@
 
 | 主题 | 文件 | 来源 |
 | --- | --- | --- |
-| On-Policy Distillation | [on_policy-distillation.md](on_policy-distillation.md) | Thinking Machines 博客 |
+| On-Policy Distillation | [on_policy-distillation.md](on_policy-distillation.md) | Thinking Machines 博客,Retinking OPD |
 | Tongyi DeepResearch | [Tongyi_DeepResearch.md](Tongyi_DeepResearch.md) | 通义 Agent 博客 |
 
 ## 后续整理方向
