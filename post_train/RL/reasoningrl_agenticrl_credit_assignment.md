@@ -1,7 +1,7 @@
 # 从 Reasoning RL 到 Agentic RL：Credit Assignment 的系统理解
 
 > 主题：基于论文 **From Reasoning to Agentic: Credit Assignment in Reinforcement Learning for Large Language Models**，系统梳理 Reasoning RL 与 Agentic RL 的核心差异，以及为什么 Credit Assignment 是二者训练范式变化中的关键问题。  
-> 论文版本：用户提供的 arXiv `2604.09459v1`，该版本提交于 2026-04-10；arXiv 页面显示最新版本为 2026-04-13 的 `v2`。本文按 `v1` 内容整理。  
+> 综述 arXiv `2604.09459v1` 和用户给出的飞书阅读笔记
 > 关键词：Reasoning RL、Agentic RL、Credit Assignment、GRPO、PRM、LLM-as-Critic、Hindsight Credit、Counterfactual Credit。
 
 ## 1. 一句话总结
