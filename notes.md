@@ -5,7 +5,7 @@
 ## AI 与机器学习
 
 - 大语言模型
-- [强化学习](/RL/)
+- [后训练](/post_train/)
 - [verl 框架实践](/verl-tutorial/)
 - 模型评测与数据处理
 - SGLang

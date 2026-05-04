@@ -6,7 +6,7 @@
 
 | 项目 | 方向 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| VERL 使用教程 | AI 工程 | 进行中 | 面向实践者的 verl 学习文档 |
+| agenticRL by data flywheels | post-train | 进行中 | 构建从数据飞轮合成数据到agentic rl全过程 |
 | 个人知识库 | 文档站点 | 进行中 | 基于 docsify 和 GitHub Pages 搭建 |
 
 ## 项目模板

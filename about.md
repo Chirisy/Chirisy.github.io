@@ -28,7 +28,6 @@
 
 ## 资源链接
 
-- [《深入浅出PyTorch》](https://zhuanlan.zhihu.com/p/2017924932802201096)
 - [《科学空间》](https://spaces.ac.cn/category/Big-Data)
 - [《动手学深度学习》](https://zh.d2l.ai/chapter_introduction/index.html#id2)
 - [《AI_INFRA》](https://infrasys-ai.github.io/aiinfra-docs/04Train04PostTrainRL/05DAPO.html)

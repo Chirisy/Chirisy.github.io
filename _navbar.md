@@ -3,7 +3,7 @@
 * [About](/about.md)
 
 * [TechNotes](/notes.md)
-  * [RL](/RL/)
+  * [post_train](/post_train/)
   * [veRL-tutorial](/verl-tutorial/)
   * [GR](/GR/)
   
