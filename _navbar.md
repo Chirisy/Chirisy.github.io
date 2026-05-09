@@ -8,5 +8,3 @@
   * [GR](/GR/)
   
 * [Projects](/projects.md)
-
-  
