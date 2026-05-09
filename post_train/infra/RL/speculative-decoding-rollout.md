@@ -185,3 +185,8 @@ SpecDec loss path:   cached hidden states/logprobs -> detach -> draft loss
 5. Acceptance length 不是最终指标，端到端 RL step time 才是。
 6. 在大模型、长输出、高 generation share 场景中，speculative decoding 有机会成为 RL infra 的基础 rollout primitive。
 
+## 8. 参考文献
+
+* [Better & Faster Large Language Models via Multi-token Prediction(MTP)](https://arxiv.org/abs/2404.19737)
+* [EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test](https://arxiv.org/abs/2503.01840)
+* [Accelerating RL Post-Training Rollouts via System-Integrated Speculative Decoding(MTP in rollout)](https://arxiv.org/pdf/2604.26779)
