@@ -1,7 +1,7 @@
 # Speculative Decoding Rollout
 
 > 论文：*Accelerating RL Post-Training Rollouts via System-Integrated Speculative Decoding*  
-> 主题：把 speculative decoding 作为 RL post-training 的 rollout 加速原语，集成到 NeMo RL + vLLM 中，在不改变目标策略采样分布的前提下提升 rollout 吞吐。
+> 主题：把 speculative decoding 作为 RL post-training 的 rollout 加速原语，集成到 NeMo RL + vLLM、verl 和 slime 等训练系统中，在不改变目标策略采样分布的前提下提升 rollout 吞吐。
 
 ## 1. 一句话总结
 
@@ -162,7 +162,189 @@ SpecDec loss path:   cached hidden states/logprobs -> detach -> draft loss
 
 更大的模型和更长的 rollout 通常更容易从 speculative decoding 中获益，因为 generation share 更高，decode-heavy 特征更明显。
 
-## 6. 对 RL Infra 的启示
+## 6. verl 中的 MTP / speculative rollout 实践
+
+verl 文档把 MTP 分成两个问题：训练侧如何让 MTP 模块跟上主模型，以及 rollout 侧如何把 MTP 作为推测解码能力交给推理引擎使用。它的重点不是“只要打开 MTP 就一定更快”，而是明确支持范围、训练配置和硬件约束。
+
+### 6.1 支持范围
+
+verl 当前的 MTP RL 训练路径主要面向 mimo-7B-RL、Qwen-next、DeepSeek 系列等 MTP 架构模型。训练后端限制较强：
+
+| 维度 | verl 文档中的约束 |
+| --- | --- |
+| 训练引擎 | 仅支持 `mbridge/Megatron-Bridge + megatron` 组合 |
+| 推理引擎 | 原则上兼容所有引擎，但模型必须在对应推理引擎的兼容列表中 |
+| Megatron | 需要支持 MTP + CP 训练的开发版本 |
+| SGLang | 文档建议使用修复 MTP tensor 权重更新 OOM 的指定分支或相应 PR |
+
+这意味着在 verl 里做 speculative rollout，第一步不是调 `num_speculative_tokens`，而是确认训练后端、模型 checkpoint、推理引擎和权重更新路径都支持 MTP 参数。
+
+### 6.2 MTP 训练配置
+
+verl 的核心配置都挂在 `actor_rollout_ref.model.mtp` 前缀下。常见场景可以分成三类：
+
+| 场景 | 关键配置 | 语义 |
+| --- | --- | --- |
+| 只加载 MTP 参数 | `enable=True` | 显存占用增加，导出参数包含 MTP 模块，可用于部署 |
+| 全参数 MTP 训练 | `enable=True`, `enable_train=True`, `mtp_loss_scaling_factor=0.1` | MTP loss 会作用到所有模型参数 |
+| 只训练 MTP 参数 | `enable=True`, `enable_train=True`, `detach_encoder=True` | 冻结主干 encoder，只更新 MTP 模块 |
+
+文档里的一个关键经验是：推荐优先使用 `detach_encoder=True` 训练 MTP。这样可以让 MTP draft 适配当前 rollout 分布，同时降低 MTP loss 对主策略学习的干扰。
+
+典型命令行形态可以写成：
+
+```bash
+actor_rollout_ref.model.mtp.enable=True \
+actor_rollout_ref.model.mtp.enable_train=True \
+actor_rollout_ref.model.mtp.detach_encoder=True \
+actor_rollout_ref.model.mtp.mtp_loss_scaling_factor=0.1
+```
+
+如果目标是排查 MTP 配置是否真的生效，要把几种“看起来开了 MTP 但语义不同”的场景拆开看：
+
+- checkpoint 没有 MTP 参数：无法形成有效 MTP draft。
+- MTP 参数存在但不训练：短期可用，长期可能随 policy drift 降低 accepted length。
+- 设置了 `enable_train=True`，但 `mtp_loss_scaling_factor=0`：等价于不训练 MTP loss。
+- `detach_encoder=True`：主要更新 MTP 模块，适合保护主策略；不要把主模型训练曲线变化当成它的主要目标。
+
+### 6.3 Rollout 推理配置
+
+verl 把 rollout 阶段的 MTP 加速也放在 `actor_rollout_ref.model.mtp` 下面，但 vLLM 和 SGLang 的配置不同。
+
+vLLM 路径：
+
+```bash
+actor_rollout_ref.model.mtp.enable=True \
+actor_rollout_ref.model.mtp.enable_rollout=True \
+actor_rollout_ref.model.mtp.method=mtp \
+actor_rollout_ref.model.mtp.num_speculative_tokens=1
+```
+
+SGLang 路径：
+
+```bash
+actor_rollout_ref.model.mtp.enable=True \
+actor_rollout_ref.model.mtp.enable_rollout=True \
+actor_rollout_ref.model.mtp.speculative_algorithm=EAGLE \
+actor_rollout_ref.model.mtp.speculative_num_steps=2 \
+actor_rollout_ref.model.mtp.speculative_eagle_topk=2 \
+actor_rollout_ref.model.mtp.speculative_num_draft_tokens=4
+```
+
+这里的语义和前文一致：MTP 只负责 draft proposal，最终 rollout token 仍由 target model / verifier 验证。因此训练侧的 logprob、reward、advantage 和 policy loss 不应切到 draft policy 上。
+
+### 6.4 性能注意事项
+
+verl 文档给出的实验设置是 `mimo-7B-math`、`max_response_length=8k`。文档提到，启用 MTP 能把 rollout acceptance rate 提高约 14%，但在 H20 上整体吞吐没有提升，甚至可能下降；以 mimo-7B + SGLang 单独部署在 H20 为例，开启 MTP 推测解码后 rollout 吞吐下降约 50%。
+
+这和论文的结论一致：acceptance length 或 acceptance rate 不是最终目标，端到端 step time 才是。MTP 推理收益强依赖模型大小和硬件，尤其依赖 verifier 批量验证是否足够高效。verl 文档列出的 FP16 Tensor Core 性能差异很大，H20 显著低于 H800 / H200，因此较小模型或较弱推理硬件上，MTP draft overhead 可能盖过加速收益。
+
+工程上可以按这个顺序判断是否值得开启：
+
+1. 先打开 stage-level profiling，分开看 `T_prepare`、`T_gen`、`T_logprob` 和 `T_train`。
+2. 如果 generation 本身不是瓶颈，不要期望 MTP 改善整体 step time。
+3. 如果 acceptance rate 上升但 tokens/s 下降，说明 draft/verify 调度或硬件利用率是瓶颈。
+4. 对 H20 这类场景，verl 文档当前更偏向“推理阶段暂不开启 MTP 加速”，等待 rollout speculative 逻辑进一步优化。
+
+## 7. slime 中的在线 MTP draft 实践
+
+slime 的实践更强调 RL 过程中 draft model 的在线更新。它把问题说得很直接：随着 RL 训练推进，target model 会持续变化，如果 draft model 冻结，draft 和 target 的采样概率差异会变大，accepted length 会逐渐下降，speculative decoding 可能从正收益变成负收益。
+
+### 7.1 推理侧开启 speculative rollout
+
+slime 使用 SGLang 作为 rollout 推理后端时，对于带 MTP 层的模型，例如 GLM-4.6、DeepSeek-V3/R1，可以直接打开 EAGLE speculative decoding：
+
+```bash
+--sglang-speculative-algorithm EAGLE \
+--sglang-speculative-num-steps 3 \
+--sglang-speculative-eagle-topk 1 \
+--sglang-speculative-num-draft-tokens 4
+```
+
+如果使用单独训练出来的 draft model，例如 SpecForge 训练的 draft，还需要指定路径：
+
+```bash
+--sglang-speculative-draft-model-path /your/draft/model/path
+```
+
+slime 文档当前也明确说明：外部 draft model 的训练仍在 WIP。因此比较成熟的路径是使用模型自带 MTP 层，并在 RL 流程里在线训练它。
+
+### 7.2 Online SFT draft model
+
+Notion 实践文章的核心方案是在 Megatron backend 内部为 MTP 层增加一条 CE loss flow，用 target model 的 hidden state 和 generated tokens 训练 MTP 层，使 draft 跟随当前 target policy。
+
+MTP 训练目标不是普通 AR 的 `input(t) -> output(t+1)`，而更接近 EAGLE MTP 的两步预测：
+
+```text
+Input(t) + Input(t+1) -> Output(t+2)
+```
+
+假设 target model 生成序列为 `[a, b, c, d, e]`，对应 hidden state 为 `[h(a), h(b), h(c), h(d), h(e)]`，token embedding 为 `[e(a), e(b), e(c), e(d), e(e)]`。MTP 层输入来自两部分：
+
+- target model forward 过程中得到的 hidden state。
+- 将生成 token 左移一次后得到的 token embedding。
+
+训练流可以概括为：
+
+```text
+target_model_hidden_state = [h(a), h(b), h(c), h(d), h(e)]
+rolled_tokens = roll([a, b, c, d, e], shift=-1) = [b, c, d, e, pad]
+token_embedding = embed(rolled_tokens) = [e(b), e(c), e(d), e(e), pad]
+
+draft_hidden_state = mtp(concat([token_embedding, target_model_hidden_state]))
+mtp_logits = shared_output_layer(draft_hidden_state)
+
+labels = roll(rolled_tokens, shift=-1) = [c, d, e, pad, pad]
+mtp_loss = cross_entropy(labels, mtp_logits)
+```
+
+Megatron 返回 target model logprobs 后，RL 框架照常计算 GRPO loss；随后一次 `backward()` 同时触发 GRPO loss 和 MTP CE loss 的反向传播。
+
+### 7.3 梯度隔离
+
+slime 实践里的关键安全边界是 detach：
+
+- detach 主模型传给 MTP 的 hidden state。
+- detach 主模型和 MTP 共享的 lm head。
+- detach 主模型和 MTP 共享的 embedding。
+
+这样做的目的不是让 MTP 完全孤立，而是避免 MTP CE loss 反向污染主策略更新。主模型仍由 GRPO / PPO 等 RL objective 驱动；MTP 只学习更好地预测 target policy 接下来会接受的 token，从而提高 accepted length。
+
+对应 slime 开关是：
+
+```bash
+--mtp-num-layers 1 \
+--enable-mtp-training \
+--mtp-loss-scaling-factor 0.2
+```
+
+需要注意的是，MTP 训练要求 checkpoint 本身包含 MTP 权重。因此从 Hugging Face checkpoint 转成 torch dist 时，也要带上：
+
+```bash
+--mtp-num-layers 1
+```
+
+### 7.4 实验现象
+
+slime / Notion 实践使用 H200 集群、Mimo-7B-RL、DAPO-Math-17k、`max_response_length=24k`，并设置 `mtp_loss_scaling_factor=0.35`、attention backend 为 `fa3`。对比组包括：
+
+| 设置 | 含义 |
+| --- | --- |
+| 训练 MTP + speculative decoding | 启用 MTP 层推测解码，并在 RL 中训练 MTP |
+| 冻结 MTP + speculative decoding | 启用 MTP 推理，但不训练 MTP |
+| 无 speculative decoding | 普通 autoregressive rollout |
+
+主要现象：
+
+- 开启 MTP 训练后，accepted length 稳步上涨，MTP loss 下降。
+- 相比不开 speculative decoding，训练 MTP 的 speculative rollout 整体约有 35% 性能提升。
+- 相比冻结 MTP，训练 MTP 整体约有 14% 提升，训练后期差距可扩大到约 25%。
+- 额外训练 MTP layer 会增加少量训练成本，但相对采样节省的时间，整体仍然有收益。
+- 训练效果符合理论预期：speculative decoding 不改变 target model 的采样分布，因此不应改变主模型训练效果。
+
+这套实践补上了论文中 “draft coherence” 的工程闭环：draft 不只是初始化时贴近 policy，而是在 RL 过程中持续跟随 policy。
+
+## 8. 对 RL Infra 的启示
 
 这篇文章可以理解为一个系统设计提醒：RL post-training 里的 rollout 加速不能只看推理吞吐，还必须维护训练语义。
 
@@ -175,18 +357,26 @@ SpecDec loss path:   cached hidden states/logprobs -> detach -> draft loss
 5. **是否有 stage-level telemetry**：只看 tokens/s 不够，要分开看 prepare、generation、logprob、training。
 6. **draft length 是否按端到端时间调参**：acceptance length 高不代表 step time 低。
 7. **异步训练下要看 exposed generation time**：如果 generation 已被 pipeline overlap 隐藏，speculative decoding 的边际收益会变小。
+8. **MTP 训练是否和主策略梯度隔离**：在线训练 draft 时，要清楚哪些 hidden state、lm head、embedding 被 detach，避免 draft loss 改写 policy objective。
+9. **checkpoint 是否真的包含 MTP 权重**：只打开配置但 checkpoint 没有 MTP 参数，rollout 推测路径不会得到预期收益。
+10. **硬件是否适合推测解码**：小模型、弱 Tensor Core、低 batch 或验证调度开销高时，acceptance rate 上升也可能换来吞吐下降。
 
-## 7. 核心 takeaways
+## 9. 核心 takeaways
 
 1. RL post-training 的瓶颈正在明显转向 rollout generation，尤其是 reasoning 和 agentic 场景。
 2. Speculative decoding 是少数可以提升 rollout throughput、同时保持 target policy 采样分布的加速方式。
 3. 真正困难的是系统集成：权重同步、draft coherence、verifier-exact logprob、在线 draft 更新和异步流水线组合。
 4. Draft 质量要按 RL rollout distribution 评估，而不是按通用聊天能力评估。
 5. Acceptance length 不是最终指标，端到端 RL step time 才是。
-6. 在大模型、长输出、高 generation share 场景中，speculative decoding 有机会成为 RL infra 的基础 rollout primitive。
+6. verl 的 MTP 实践说明：MTP 参数、训练后端、推理引擎、权重同步和硬件条件都满足时，才值得打开 speculative rollout。
+7. slime 的在线 MTP 训练说明：冻结 draft 会随 policy 漂移而退化，在线 SFT draft 能长期维持 accepted length。
+8. 在大模型、长输出、高 generation share 场景中，speculative decoding 有机会成为 RL infra 的基础 rollout primitive。
 
-## 8. 参考文献
+## 10. 参考文献
 
 * [Better & Faster Large Language Models via Multi-token Prediction(MTP)](https://arxiv.org/abs/2404.19737)
 * [EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test](https://arxiv.org/abs/2503.01840)
 * [Accelerating RL Post-Training Rollouts via System-Integrated Speculative Decoding(MTP in rollout)](https://arxiv.org/pdf/2604.26779)
+* [verl: 在 SFT/RL 训练和推理中使用 MTP 指南](https://verl.org.cn/en/latest/advance/mtp.html)
+* [slime: 投机采样](https://thudm.github.io/slime/zh/advanced/speculative-decoding.html)
+* [Power Up Speculative Decoding In Reinforcement Learning](https://www.notion.so/jiajunli-guapisolo/Power-Up-Speculative-Decoding-In-Reinforcement-Learning-2a92d24a293b802d9c73dbae429e581e)

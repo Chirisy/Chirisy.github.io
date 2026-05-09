@@ -6,5 +6,4 @@
 
 | 主题 | 文件 | 内容 |
 | --- | --- | --- |
-| Speculative Decoding Rollout | [speculative-decoding-rollout.md](/post_train/infra/RL/speculative-decoding-rollout.md) | 总结论文 *Accelerating RL Post-Training Rollouts via System-Integrated Speculative Decoding*，梳理问题背景、动机和系统方法 |
-
+| Speculative Decoding Rollout | [speculative-decoding-rollout.md](/post_train/infra/RL/speculative-decoding-rollout.md) | 总结论文 *Accelerating RL Post-Training Rollouts via System-Integrated Speculative Decoding*，并补充 verl MTP rollout 与 slime 在线 MTP draft 训练实践 |
